@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import CoreLocation
 
 protocol WeatherManagerDelegate {
     func didUpdateWeather(_ weatherManager: WeatherManager, weather: WeatherModel)
@@ -14,20 +15,22 @@ protocol WeatherManagerDelegate {
 }
 
 struct WeatherManager {
-    let weatherURL = "https://api.openweathermap.org/data/2.5/weather?appid=280bbe4efdf3d2ae9a510b56ed9bdcf3&units=metric"
+    
     var delegate: WeatherManagerDelegate?
     
-    func fetchWeather(cityName: String) {
-        let urlString = "\(weatherURL)&q=\(cityName)"
-        //componentUrl = createUrlComponents(city: cityName)
-        performRequest(with: cityName)
+    func fetchWeather(with cityName: String) {
+        
+        let componentUrl = createUrlComponents(with: [URLQueryItem(name: "q", value: cityName)])
+        performRequest(with: componentUrl)
     }
     
-    func performRequest(with urlString: String) {
-        //1. Create URL
-        print(urlString)
-        
-        let componentUrl = createUrlComponents(city: urlString)
+    func fetchWeather(withLatLong latitude: CLLocationDegrees, longitude: CLLocationDegrees) {
+        let queryItems = [URLQueryItem(name: "lat", value: String(format:"%f", latitude)),URLQueryItem(name: "lon", value: String(format:"%f", longitude))]
+        let componentUrl = createUrlComponents(with: queryItems)
+        performRequest(with: componentUrl)
+    }
+    
+    func performRequest(with componentUrl: URLComponents) {
         
         // 2. Url session
         let session = URLSession(configuration: .default)
@@ -37,7 +40,7 @@ struct WeatherManager {
         }
         
         //3. give the session a task
-        let task = session.dataTask(with: validUrl, completionHandler: { (data, response, error) in
+        _ = session.dataTask(with: validUrl, completionHandler: { (data, response, error) in
             
             if error != nil {
                 // print(error!)
@@ -53,7 +56,6 @@ struct WeatherManager {
             
         }).resume()
         
-        
     }
     
     func parseJSON(_ weatherData: Data) -> WeatherModel? {
@@ -64,11 +66,9 @@ struct WeatherManager {
             let temp = decodedData.main.temp
             let name = decodedData.name
             let weather = WeatherModel(conditionId: id, citiName: name, temprature: temp)
-            //print(weather.conditionName)
             return weather
             
         } catch {
-            // print(error)
             self.delegate?.didFailWithError(error: error)
             return nil
         }
@@ -77,15 +77,13 @@ struct WeatherManager {
     
     
     
-    func createUrlComponents(city: String) -> URLComponents {
+    func createUrlComponents(with queryItems: [URLQueryItem]) -> URLComponents {
         var componentURL = URLComponents()
         
         componentURL.scheme = "https"
         componentURL.host = "api.openweathermap.org"
         componentURL.path = "/data/2.5/weather"
-        componentURL.query = "appid=280bbe4efdf3d2ae9a510b56ed9bdcf3&units=metric&q=\(city)"
-        //componentURL.queryItems =  [URLQueryItem(name: "appid", value: "280bbe4efdf3d2ae9a510b56ed9bdcf3"),URLQueryItem(name: "units", value: "metric"),URLQueryItem(name: "q", value: city)] //"appid=280bbe4efdf3d2ae9a510b56ed9bdcf3&units=metric&q=\(city)"
-        
+        componentURL.queryItems =  [URLQueryItem(name: "appid", value: "280bbe4efdf3d2ae9a510b56ed9bdcf3"),URLQueryItem(name: "units", value: "metric")] + queryItems
         return componentURL
     }
     

@@ -8,59 +8,74 @@
 
 import Foundation
 
+protocol WeatherManagerDelegate {
+    func didUpdateWeather(_ weatherManager: WeatherManager, weather: WeatherModel)
+    func didFailWithError(error: Error)
+}
+
 struct WeatherManager {
     let weatherURL = "https://api.openweathermap.org/data/2.5/weather?appid=280bbe4efdf3d2ae9a510b56ed9bdcf3&units=metric"
-    
+    var delegate: WeatherManagerDelegate?
     
     func fetchWeather(cityName: String) {
         let urlString = "\(weatherURL)&q=\(cityName)"
         //componentUrl = createUrlComponents(city: cityName)
-        performRequest(urlString: cityName)
+        performRequest(with: cityName)
     }
     
-    func performRequest(urlString: String) {
+    func performRequest(with urlString: String) {
         //1. Create URL
         print(urlString)
-        //if let url = URL(string: urlString)  {
         
-           
-           //let url = URL(string: urlString)!
         let componentUrl = createUrlComponents(city: urlString)
-            //print("url \(url)")
-            // 2. Url session
-            let session = URLSession(configuration: .default)
-            guard let validUrl = componentUrl.url else {
-                print("URL creation failed")
-                return
-            }
-            
-            //3. give the session a task
-            let task = session.dataTask(with: validUrl, completionHandler: handle(data: response: error:))
-            
-            //4. start the task
-            task.resume()
-        //} else {
-           // print("Error parsing URL")
-       // }
         
-  
-        
-    }
-    
-    func handle(data: Data?, response: URLResponse?, error: Error?) -> Void {
-        
-        if error != nil {
-            print(error!)
+        // 2. Url session
+        let session = URLSession(configuration: .default)
+        guard let validUrl = componentUrl.url else {
+            print("URL creation failed")
             return
         }
         
-        if let safeData = data {
-            let dataString = String(data: safeData, encoding: .utf8)
-            print(dataString!)
-        }
+        //3. give the session a task
+        let task = session.dataTask(with: validUrl, completionHandler: { (data, response, error) in
+            
+            if error != nil {
+                // print(error!)
+                self.delegate?.didFailWithError(error: error!)
+                return
+            }
+            
+            if let safeData = data {
+                if let weather = self.parseJSON(safeData) {
+                    self.delegate?.didUpdateWeather(self,weather: weather)
+                }
+            }
+            
+        }).resume()
         
         
     }
+    
+    func parseJSON(_ weatherData: Data) -> WeatherModel? {
+        let decoder = JSONDecoder()
+        do {
+            let decodedData = try decoder.decode(WeatherData.self, from: weatherData)
+            let id = decodedData.weather[0].id
+            let temp = decodedData.main.temp
+            let name = decodedData.name
+            let weather = WeatherModel(conditionId: id, citiName: name, temprature: temp)
+            //print(weather.conditionName)
+            return weather
+            
+        } catch {
+            // print(error)
+            self.delegate?.didFailWithError(error: error)
+            return nil
+        }
+        
+    }
+    
+    
     
     func createUrlComponents(city: String) -> URLComponents {
         var componentURL = URLComponents()
@@ -73,4 +88,6 @@ struct WeatherManager {
         
         return componentURL
     }
+    
+    
 }
